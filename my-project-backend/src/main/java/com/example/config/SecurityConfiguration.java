@@ -21,6 +21,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 
 @Configuration
 public class SecurityConfiguration {
@@ -82,20 +83,30 @@ public class SecurityConfiguration {
         vo.setUsername("小明");
         //创建JWToken
         response.getWriter().write(RestBean.success(vo).asJsonString());
-    }//登陆成功验证
+    }
+    //登陆成功验证
 
     public void onAuthenticationFailure(HttpServletRequest request,
                                         HttpServletResponse response,
                                         AuthenticationException exception) throws IOException, ServletException {
         response.setContentType("application/json;charset=utf-8");
         response.getWriter().write(RestBean.unauthorized(exception.getMessage()).asJsonString());
-    }//登陆失败验证
+    }
+    //登陆失败验证
 
     public void onLogoutSuccess(HttpServletRequest request,
                                 HttpServletResponse response,
                                 Authentication authentication) throws IOException, ServletException {
-//        response.getWriter().write("Success Logout");
-    }//退出登录成功验证
+        response.setContentType("application/json;charset=utf-8");
+        PrintWriter writer = response.getWriter();
+        String authorization = request.getHeader("Authorization");
+        if(utils.invalidateJwt(authorization)) {
+            writer.write(RestBean.success().asJsonString());
+        } else {
+            writer.write(RestBean.failure(400, "退出登陆失败").asJsonString());
+        }
+    }
+    //退出登录成功验证
 
 
     public void onAccessDeny(HttpServletRequest request,
@@ -109,6 +120,7 @@ public class SecurityConfiguration {
     public void onUnauthorized(HttpServletRequest request,
                                HttpServletResponse response,
                                AuthenticationException exception) throws IOException {
+        System.out.println("未登录");
         response.setContentType("application/json;charset=utf-8");
         response.getWriter().write(RestBean.unauthorized(exception.getMessage()).asJsonString());
     }

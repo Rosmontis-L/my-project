@@ -6,7 +6,9 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
+import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Component;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class JwtUtils {
@@ -27,6 +31,39 @@ public class JwtUtils {
     @Value("${spring.security.jwt.expire}")
     int expire;
 
+
+    @Resource
+    StringRedisTemplate template;
+
+    public boolean invalidateJwt(String headerToken) {
+        String token = this.convertToken(headerToken);
+        if (token == null) return false;
+        Algorithm algorithm = Algorithm.HMAC256(key);
+        JWTVerifier verifier = JWT.require(algorithm).build();
+        try {
+            DecodedJWT jwt = verifier.verify(token);
+            String id = jwt.getId();
+            return deleteToken(id, jwt.getExpiresAt());
+        }  catch (JWTVerificationException e){
+            return false;
+        }
+    }
+    //将要删除的Token存到Redis里面
+
+    private boolean deleteToken(String uuid, Date time) {
+        if(this.isInvalidToken(uuid)) return false;
+        Date now = new Date();
+        long expire = Math.max(time.getTime() - now.getTime(), 0);
+        template.opsForValue().set(Const.JWT_BLACK_LIST + uuid, "", expire, TimeUnit.MILLISECONDS);
+        return true;
+    }
+    //先检验redis数据库是否存在这个uuid，存在就不用将这个uuid存入，否则的话存入redis数据库
+
+    private boolean isInvalidToken(String uuid) {
+        return Boolean.TRUE.equals(template.hasKey(Const.JWT_BLACK_LIST + uuid));
+    }
+    //查询redis数据库是否有这个uuid
+
     public DecodedJWT resolve(String headerToken) {
         String token = this.convertToken(headerToken);
         if (token == null) return null;
@@ -35,6 +72,9 @@ public class JwtUtils {
         try {
             DecodedJWT verify = verifier.verify(token);
             //解析JWTToken是否被篡改，如果篡改会抛出运行异常
+            if(this.isInvalidToken(verify.getId()))
+                return null;
+            //验证这个uuid是否被丢弃了
             Date expiresAt = verify.getExpiresAt();
             return new Date().after(expiresAt) ? null : verify;
             //判断现在的日期是否超过设定的过期时间
@@ -48,6 +88,7 @@ public class JwtUtils {
         Algorithm algorithm = Algorithm.HMAC256(key);
         Date expire = expireTime();
         return JWT.create()
+                .withJWTId(UUID.randomUUID().toString())
                 .withClaim("id", id)
                 .withClaim("name", username)
                 .withClaim("authorities", details.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList())
