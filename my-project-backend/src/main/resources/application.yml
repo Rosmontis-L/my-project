@@ -1,0 +1,5 @@
+spring:
+  security:
+    jwt:
+      key: I love Amiya
+      expire: 7
