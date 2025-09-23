@@ -82,11 +82,11 @@ public class SecurityConfiguration {
         String token = utils.createJwt(user, account.getId(), account.getUsername());
 
         //这里在把JWTToken和过期时间信息封装在一个AuthorizeVO里面，这个vo的实体类也就是面对用户端交互所使用的
-        AuthorizeVO vo = new AuthorizeVO();
-        vo.setExpire(utils.expireTime());
-        vo.setRole(account.getRole());
-        vo.setToken(token);
-        vo.setUsername(account.getUsername());
+        AuthorizeVO vo = account.asViewObject(AuthorizeVO.class, v ->{
+            v.setExpire(utils.expireTime());
+            v.setToken(token);
+        });
+
         //创建JWToken
         response.getWriter().write(RestBean.success(vo).asJsonString());
     }
