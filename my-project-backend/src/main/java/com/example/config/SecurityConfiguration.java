@@ -1,8 +1,10 @@
 package com.example.config;
 
 import com.example.entity.RestBean;
+import com.example.entity.dto.Account;
 import com.example.entity.vo.response.AuthorizeVO;
 import com.example.filter.JwtAuthorizeFilter;
+import com.example.service.AccountService;
 import com.example.utils.JwtUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletException;
@@ -31,6 +33,9 @@ public class SecurityConfiguration {
 
     @Resource
     JwtAuthorizeFilter jwtAuthorizeFilter;
+
+    @Resource
+    AccountService service;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -73,14 +78,15 @@ public class SecurityConfiguration {
                                         Authentication authentication) throws IOException, ServletException {
         response.setContentType("application/json;charset=utf-8");
         User user = (User)authentication.getPrincipal();//获取用户信息
-        String token = utils.createJwt(user, 1, "小明");
+        Account account = service.findAccountByNameOrEmail(user.getUsername());
+        String token = utils.createJwt(user, account.getId(), account.getUsername());
 
         //这里在把JWTToken和过期时间信息封装在一个AuthorizeVO里面，这个vo的实体类也就是面对用户端交互所使用的
         AuthorizeVO vo = new AuthorizeVO();
         vo.setExpire(utils.expireTime());
-        vo.setRole("");
+        vo.setRole(account.getRole());
         vo.setToken(token);
-        vo.setUsername("小明");
+        vo.setUsername(account.getUsername());
         //创建JWToken
         response.getWriter().write(RestBean.success(vo).asJsonString());
     }
