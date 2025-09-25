@@ -14,7 +14,7 @@
       <div style="margin-top: 5px">在这里你可以与其它用户相互交流学习经验</div>
     </div>
     <div class="right-card">
-
+      <router-view/>
     </div>
   </div>
 </template>
